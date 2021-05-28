@@ -1,1 +1,1 @@
-# pytest-kafka-events
+# pytest-kafkavents
