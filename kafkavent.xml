@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<testsuites>
+  <testsuite errors="0" failures="2" hostname="localhost.localdomain" name="pytest" skipped="2" tests="5" time="4.100" timestamp="2021-06-17T23:13:32.839118">
+    <testcase classname="test_pytest_plugin.TestPyTestKafkavent" file="test_pytest_plugin.py" line="44" name="test_fail" time="0.001">
+      <failure message="AssertionError: True != False : this should have failed">self = &lt;test_pytest_plugin.TestPyTestKafkavent testMethod=test_fail&gt;
+
+    def test_fail(self):
+&gt;       self.assertEqual(True, False, "this should have failed")
+E       AssertionError: True != False : this should have failed
+
+test_pytest_plugin.py:46: AssertionError</failure>
+    </testcase>
+    <testcase classname="test_pytest_plugin.TestPyTestKafkavent" file="test_pytest_plugin.py" line="47" name="test_fail2" time="0.001">
+      <failure message="AssertionError: True != False : this should have also failed">self = &lt;test_pytest_plugin.TestPyTestKafkavent testMethod=test_fail2&gt;
+
+    def test_fail2(self):
+&gt;       self.assertEqual(True, False, "this should have also failed")
+E       AssertionError: True != False : this should have also failed
+
+test_pytest_plugin.py:49: AssertionError</failure>
+    </testcase>
+    <testcase classname="test_pytest_plugin.TestPyTestKafkavent" file="test_pytest_plugin.py" line="40" name="test_pass" time="2.002"/>
+    <testcase classname="test_pytest_plugin.TestPyTestKafkavent" file="test_pytest_plugin.py" line="50" name="test_skip" time="0.001">
+      <skipped message="skipping intentionally" type="pytest.skip">/home/jhollowa/Develop/git/github/grandcentralstation/pytest-kafkavents/test_pytest_plugin.py:51: skipping intentionally</skipped>
+    </testcase>
+    <testcase classname="test_pytest_plugin.TestPyTestKafkavent" file="test_pytest_plugin.py" line="54" name="test_xfail" time="0.001">
+      <skipped message="always xfail" type="pytest.xfail"/>
+    </testcase>
+  </testsuite>
+</testsuites>
