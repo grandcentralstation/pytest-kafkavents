@@ -14,12 +14,13 @@
 # along with this software. If not, see <http://www.gnu.org/licenses/>.
 #
 """Test glusto basic functionality"""
+import pytest
+import random
 import time
 import unittest
-import pytest
 
 
-class TestPyTestKafkavent(unittest.TestCase):
+class TestPyTestKafkavent3(unittest.TestCase):
     """Glusto basics test class"""
     @classmethod
     def setUpClass(cls):
@@ -35,11 +36,9 @@ class TestPyTestKafkavent(unittest.TestCase):
         Runs before each test_ method
         """
         # print("Setting Up: %s" % self.id())
-
-        pass
+        time.sleep(random.randint(0, 3))
 
     def test_pass(self):
-        time.sleep(2)
         self.assertEqual(True, True, 'this should have passed')
 
     def test_fail(self):
@@ -50,7 +49,7 @@ class TestPyTestKafkavent(unittest.TestCase):
 
     @pytest.mark.skip(reason="skipping intentionally")
     def test_skip(self):
-        self.assertEqual(True, False, "this should have failed")
+        self.assertEqual(True, False, "this should have skipped")
 
     @pytest.mark.xfail(reason="always xfail")
     def test_xfail(self):

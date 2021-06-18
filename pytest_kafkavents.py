@@ -23,6 +23,13 @@ from confluent_kafka import Producer
 def pytest_addoption(parser):
     group = parser.getgroup("kafkavent")
     group.addoption(
+        "--kv_conf",
+        action="store",
+        dest="kv_configfile",
+        default="kafka_conf.json",
+        help='Kafka connection configs',
+    )
+    group.addoption(
         "--kv_sessionprefix",
         action="store",
         dest="kv_sessionprefix",
@@ -39,12 +46,20 @@ def pytest_addoption(parser):
 
 
 def pytest_configure(config):
-    #name = config.getoption('name')
-    #print(f"My name is: {name}")
+    """Configure global items and add things to the config"""
+    kv_configfile = config.getoption('kv_configfile')
 
-    config.kafkaconf = {'bootstrap.servers': 'my-kafka-n--u-bvmxxe-dvgycp-axfjmaftyk.bf2.kafka.rhcloud.com:443', 'group.id': "foo", 'sasl.mechanism': 'PLAIN','security.protocol': 'SASL_SSL', 'sasl.username':'srvc-acct-820a23a1-b69b-48ac-b153-c3212805de0c', 'sasl.password':'baae54a6-92c1-4020-b405-935356faeb9c'}
-    config.kafka_producer = Producer(config.kafkaconf)
+    # Setup Kafka
+    fileh = open(kv_configfile)
+    kafkaconf = json.load(fileh)
+    fileh.close()
+
+    config.kafka_producer = Producer(kafkaconf)
     config.kv_session_token = secrets.token_urlsafe(16)
+
+
+def pytest_unconfigure(config):
+    pass
 
 
 def pytest_runtest_setup(item):
@@ -57,9 +72,17 @@ def pytest_runtest_teardown(item):
     pass
 
 
+def pytest_sessionstart():
+    print('\nSESSION STARTED')
+
+
+def pytest_sessionfinish():
+    print('\nSESSION FINISHED')
+
+
 def pytest_report_teststatus(report, config):
     kv_session = f"{config.option.kv_sessionprefix}_{config.kv_session_token}"
-    kv_topic = config.option.kv_topic
+    kv_topics = config.option.kv_topic.split(',')
 
     if report.when == 'teardown':
         return
@@ -72,16 +95,19 @@ def pytest_report_teststatus(report, config):
     kafkavent['nodeid'] = report.nodeid
     kafkavent['status'] = report.outcome
     kafkavent['duration'] = report.duration
-    #kafkavent['stdout'] = report.capstdout
-    #kafkavent['stderr'] = report.capstderr
+    if report.capstdout:
+        kafkavent['stdout'] = report.capstdout
+    if report.capstderr:
+        kafkavent['stderr'] = report.capstderr
     if report.outcome == "skipped":
         kafkavent['duration'] = 0
-    #if report.outcome == "failed":
-    #    kafkavent['fail_message'] = report.longreprtext
+    if report.outcome == "failed":
+        kafkavent['message'] = report.longreprtext
 
     #print(f"\nKAFKAVENT ({kv_topic}) -> {kafkavent}")
-    config.kafka_producer.produce('my-other-topic', json.dumps(kafkavent).rstrip())
-    config.kafka_producer.flush()
+    for topic in kv_topics:
+        config.kafka_producer.produce(topic, json.dumps(kafkavent).rstrip())
+        config.kafka_producer.flush()
     '''
     print(f"KAFKAVENT {kv_session} ({report.when}): ",
           report.nodeid, report.location,
