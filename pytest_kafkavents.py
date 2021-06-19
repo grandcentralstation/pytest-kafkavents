@@ -16,6 +16,7 @@
 import json
 import os
 import pytest
+import random
 import uuid
 
 from confluent_kafka import Producer
@@ -138,7 +139,6 @@ class Kafkavent(object):
         self.kafkaprod.send(event_topics, kafkavent, type='testresult')
 
     def pytest_terminal_summary(self, terminalreporter, exitstatus):
-        print('\nTERMINAL SUMMARY')
         kafkavent = {}
         kafkavent['passed'] = len(terminalreporter.stats.get('passed',[]))
         kafkavent['failed'] = len(terminalreporter.stats.get('failed',[]))
@@ -147,51 +147,78 @@ class Kafkavent(object):
         kafkavent['status'] = exitstatus
         self.kafkaprod.send(self.topics, kafkavent, type='summary')
 
+    def pytest_generate_tests(self, metafunc):
+        print('PYTEST GENERATE TESTS')
+        if metafunc.config.getoption("kv_test"):
+            nums = metafunc.config.getoption('kv_test').split(',')
+            pass_num = int(nums[0])
+            fail_num = int(nums[1])
+            skip_num = int(nums[2])
+            xfail_num = int(nums[3])
+            pass_num = pass_num - fail_num - skip_num - xfail_num
+
+            test_outcomes = ['passed' for i in range(pass_num)]
+            test_outcomes.extend(['failed' for i in range(fail_num)])
+            test_outcomes.extend(['skipped' for i in range(skip_num)])
+            test_outcomes.extend(['xfailed' for i in range(xfail_num)])
+
+            random.shuffle(test_outcomes)
+
+            if "kvtest_outcome" in metafunc.fixturenames:
+                metafunc.parametrize("kvtest_outcome", test_outcomes)
 
 def pytest_addoption(parser):
     group = parser.getgroup("kafkavent")
     group.addoption(
-        "--kv_conf",
+        "--kv-conf",
         action="store",
         dest="kv_configfile",
         default=None,
         help='Kafka connection configs',
     )
     group.addoption(
-        "--kv_session_name",
+        "--kv-sessionname",
         action="store",
         dest="kv_session_name",
         default="Kafkavent Session",
         help='Session name for endpoint consumers to collate session data',
     )
     group.addoption(
-        "--kv_session_id",
+        "--kv-sessionid",
         action="store",
         dest="kv_session_id",
         default=None,
         help='Session ID for endpoint consumers to collate session data',
     )
     group.addoption(
-        "--kv_topics",
+        "--kv-topics",
         action="store",
         dest="kv_topics",
         default=[],
         help='Kafka topic to send events on',
     )
     group.addoption(
-        "--kv_topics_failed",
+        "--kv-topics-failed",
         action="store",
         dest="kv_failed_topics",
         default=None,
         help='Kafka topic to send FAILED test events on',
     )
     group.addoption(
-        "--kv_eventlog",
+        "--kv-eventlog",
         action="store",
         dest="kv_eventlog",
         default=None,
         help='Log to store events for debug and replay',
     )
+    group.addoption(
+        "--kv-test",
+        action="store",
+        dest="kv_test",
+        default=None,
+        help='Generate test events (# passes,# fails,# skips,# xfails)',
+    )
+
 
 def pytest_configure(config):
     """Configure global items and add things to the config"""

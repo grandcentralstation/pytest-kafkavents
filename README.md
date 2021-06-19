@@ -46,9 +46,9 @@ On Fedora...
 ```
 9. Run the example pytest test scripts
 ```
-    pytest example_tests/ --junitxml=/tmp/kafkavent.xml --kv_topics=my-other-topic
-    pytest example_tests/ -q --kv_conf examples/kafka_conf.json \
-    --kv_topics kafkavent --kv_topics_failed kafkavent-failed 
+    pytest example_tests/ --junitxml=/tmp/kafkavent.xml --kv-topics my-other-topic
+    pytest example_tests/ -q --kv-conf examples/kafka_conf.json \
+    --kv-topics kafkavent --kv-topics-failed kafkavent-failed 
 ```
 10. Or just pull the container from [Quay.io](https://quay.io) :-)
 
