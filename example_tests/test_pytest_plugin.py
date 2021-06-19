@@ -40,15 +40,12 @@ class TestPyTestKafkavent(unittest.TestCase):
         time.sleep(random.randint(0, 3))
 
     def test_pass(self):
-        print("testing stdout")
-        print("testing stderr", file=sys.stderr)
         self.assertEqual(True, True, 'this should have passed')
 
     def test_fail(self):
+        print("testing stdout")
+        print("testing stderr", file=sys.stderr)
         self.assertEqual(True, False, "this should have failed")
-
-    def test_fail2(self):
-        self.assertEqual(True, False, "this should have also failed")
 
     @pytest.mark.skip(reason="skipping intentionally")
     def test_skip(self):

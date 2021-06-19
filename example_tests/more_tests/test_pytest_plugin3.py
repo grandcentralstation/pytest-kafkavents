@@ -16,6 +16,7 @@
 """Test glusto basic functionality"""
 import pytest
 import random
+import sys
 import time
 import unittest
 
@@ -42,10 +43,9 @@ class TestPyTestKafkavent3(unittest.TestCase):
         self.assertEqual(True, True, 'this should have passed')
 
     def test_fail(self):
+        print("testing stdout")
+        print("testing stderr", file=sys.stderr)
         self.assertEqual(True, False, "this should have failed")
-
-    def test_fail2(self):
-        self.assertEqual(True, False, "this should have also failed")
 
     @pytest.mark.skip(reason="skipping intentionally")
     def test_skip(self):

@@ -14,8 +14,9 @@
 # along with this software. If not, see <http://www.gnu.org/licenses/>.
 #
 import json
+import os
 import pytest
-import secrets
+import uuid
 
 from confluent_kafka import Producer
 
@@ -31,20 +32,17 @@ def pytest_runtest_teardown(item):
     pass
 
 
-def pytest_terminal_summary(terminalreporter):
-    print('\nTERMINAL SUMMARY')
-
-
 def pytest_runtest_makereport(item, call):
     print('\nRUNTEST MAKEREPORT')
     #print(item.config)
 '''
 
 class KafkaProducer(object):
-    def __init__(self, configfile, sessionid=None):
+    def __init__(self, configfile=None, logfile=None, sessionid=None):
         if sessionid is None:
-            session_hash = secrets.token_urlsafe(16)
+            session_hash = str(uuid.uuid4())
             self.session_uuid = session_hash
+            self.logfile = logfile
 
         # Setup Kafka
         fileh = open(configfile)
@@ -54,6 +52,9 @@ class KafkaProducer(object):
         self.producer = Producer(kafkaconf)
 
         self.packetnum = 0
+
+        if os.path.exists(logfile):
+            os.remove(logfile)
 
     def send(self, topics, event, type='kafkavent', header=None):
         self.packetnum = self.packetnum + 1
@@ -68,10 +69,17 @@ class KafkaProducer(object):
             }
         packet.update({'event': event})
 
+        # send to kafka
         for topic in topics:
             self.producer.produce(topic, json.dumps(packet).rstrip())
             self.producer.flush()
 
+        # write to file
+        if self.logfile:
+            fileh = open(self.logfile, "a")
+            fileh.write(json.dumps(packet))
+            fileh.write('\n')
+            fileh.close()
 
 class Kafkavent(object):
     def __init__(self, config):
@@ -79,6 +87,8 @@ class Kafkavent(object):
         self.topics = []
         self.fail_topics = None
         self.session_name = config.getoption('kv_session_name')
+        self.eventlog = config.getoption('kv_eventlog', None)
+        self.kafkaconfig = config.getoption('kv_configfile', None)
 
         if config.getoption('kv_topics'):
             self.topics = config.getoption('kv_topics').split(',')
@@ -87,8 +97,9 @@ class Kafkavent(object):
 
         session_uuid = config.getoption('kv_sessionid', None)
 
-        self.kafkaprod = KafkaProducer(config.getoption('kv_configfile'),
-                                       sessionid=session_uuid)
+        if self.kafkaconfig is not None:
+            self.kafkaprod = KafkaProducer(self.kafkaconfig,
+                                           sessionid=session_uuid, logfile=self.eventlog)
 
     def pytest_sessionstart(self, session):
         #print('\nSESSION STARTED')
@@ -126,6 +137,16 @@ class Kafkavent(object):
 
         self.kafkaprod.send(event_topics, kafkavent, type='testresult')
 
+    def pytest_terminal_summary(self, terminalreporter, exitstatus):
+        print('\nTERMINAL SUMMARY')
+        kafkavent = {}
+        kafkavent['passed'] = len(terminalreporter.stats.get('passed',[]))
+        kafkavent['failed'] = len(terminalreporter.stats.get('failed',[]))
+        kafkavent['skipped'] = len(terminalreporter.stats.get('skipped',[]))
+        kafkavent['xfailed'] = len(terminalreporter.stats.get('xfailed',[]))
+        kafkavent['status'] = exitstatus
+        self.kafkaprod.send(self.topics, kafkavent, type='summary')
+
 
 def pytest_addoption(parser):
     group = parser.getgroup("kafkavent")
@@ -133,7 +154,7 @@ def pytest_addoption(parser):
         "--kv_conf",
         action="store",
         dest="kv_configfile",
-        default="kafka_conf.json",
+        default=None,
         help='Kafka connection configs',
     )
     group.addoption(
