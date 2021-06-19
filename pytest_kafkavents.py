@@ -20,67 +20,7 @@ import secrets
 from confluent_kafka import Producer
 
 
-def pytest_addoption(parser):
-    group = parser.getgroup("kafkavent")
-    group.addoption(
-        "--kv_conf",
-        action="store",
-        dest="kv_configfile",
-        default="kafka_conf.json",
-        help='Kafka connection configs',
-    )
-    group.addoption(
-        "--kv_sessionprefix",
-        action="store",
-        dest="kv_sessionprefix",
-        default="1234567890",
-        help='Session ID for endpoint consumers to collate session data',
-    )
-    group.addoption(
-        "--kv_topics",
-        action="store",
-        dest="kv_topics",
-        default=[],
-        help='Kafka topic to send events on',
-    )
-    group.addoption(
-        "--kv_topics_fail",
-        action="store",
-        dest="kv_fail_topics",
-        default=None,
-        help='Kafka topic to send FAILED test events on',
-    )
-    group.addoption(
-        "--kv_topics_pass",
-        action="store",
-        dest="kv_pass_topics",
-        default=None,
-        help='Kafka topic to send PASSED test events on',
-    )
-
-
-def pytest_configure(config):
-    """Configure global items and add things to the config"""
-    kv_configfile = config.getoption('kv_configfile')
-
-    '''
-    # Setup Kafka
-    fileh = open(kv_configfile)
-    kafkaconf = json.load(fileh)
-    fileh.close()
-
-    config.kafka_producer = Producer(kafkaconf)
-    config.kv_session_token = secrets.token_urlsafe(16)
-    '''
-
-    kafkavent = Kafkavent(config)
-    config.pluginmanager.register(kafkavent, 'kafkavent')
-
-
-def pytest_unconfigure(config):
-    pass
-
-
+'''
 def pytest_runtest_setup(item):
     # print("\nconftest setting up", item)
     pass
@@ -91,22 +31,14 @@ def pytest_runtest_teardown(item):
     pass
 
 
-def pytest_sessionstart(session):
-    print('\nSESSION STARTED')
-
-
-def pytest_sessionfinish(session, exitstatus):
-    print('\nSESSION FINISHED')
-
-
 def pytest_terminal_summary(terminalreporter):
     print('\nTERMINAL SUMMARY')
 
 
 def pytest_runtest_makereport(item, call):
     print('\nRUNTEST MAKEREPORT')
-    print(item.config)
-
+    #print(item.config)
+'''
 
 class KafkaProducer(object):
     def __init__(self, configfile, sessionid=None):
@@ -121,20 +53,23 @@ class KafkaProducer(object):
 
         self.producer = Producer(kafkaconf)
 
-    def send(self, topics, event, header=None):
-        print(topics)
-        header = {
+        self.packetnum = 0
+
+    def send(self, topics, event, type='kafkavent', header=None):
+        self.packetnum = self.packetnum + 1
+        packet = {
             'header': {
+                'session_id': self.session_uuid,
+                'packetnum': self.packetnum,
+                'type': type,
                 'source': 'pytest-kafkavent',
-                'version': '0.01',
-                'session_id': self.session_uuid
+                'version': '0.01'
                 }
             }
-        packet = header.update({'event': event})
+        packet.update({'event': event})
 
         for topic in topics:
-            print(topic)
-            self.producer.produce(topic, json.dumps(header).rstrip())
+            self.producer.produce(topic, json.dumps(packet).rstrip())
             self.producer.flush()
 
 
@@ -143,24 +78,28 @@ class Kafkavent(object):
         self.config = config
         self.topics = []
         self.fail_topics = None
+        self.session_name = config.getoption('kv_session_name')
 
         if config.getoption('kv_topics'):
             self.topics = config.getoption('kv_topics').split(',')
-        if config.getoption('kv_fail_topics'):
-            self.fail_topics = config.getoption('kv_fail_topics').split(',')
+        if config.getoption('kv_failed_topics'):
+            self.failed_topics = config.getoption('kv_failed_topics').split(',')
 
         session_uuid = config.getoption('kv_sessionid', None)
 
         self.kafkaprod = KafkaProducer(config.getoption('kv_configfile'),
                                        sessionid=session_uuid)
 
+    def pytest_sessionstart(self, session):
+        #print('\nSESSION STARTED')
+        self.kafkaprod.send(self.topics, {'name': self.session_name}, type='sessionstart')
+
+    def pytest_sessionfinish(self, session, exitstatus):
+        #print('\nSESSION FINISHED')
+        self.kafkaprod.send(self.topics, {'name': self.session_name}, type='sessionend')
+
     def pytest_runtest_logreport(self, report):
-        print('RUNTEST LOGREPORT ', report.nodeid)
-        print(self.config)
-
-    def pytest_report_teststatus(self, report, config):
-        print('REPORT TESTSTATUS')
-
+        #print('RUNTEST LOGREPORT ', report.nodeid)
         event_topics = self.topics.copy()
 
         if report.when == 'teardown':
@@ -172,6 +111,7 @@ class Kafkavent(object):
         kafkavent['pytest_when'] = report.when
         kafkavent['nodeid'] = report.nodeid
         kafkavent['status'] = report.outcome
+        # TODO: add timestamp
         kafkavent['duration'] = report.duration
         if report.capstdout:
             kafkavent['stdout'] = report.capstdout
@@ -181,15 +121,63 @@ class Kafkavent(object):
             kafkavent['duration'] = 0
         if report.outcome == "failed":
             kafkavent['message'] = report.longreprtext
-            if self.fail_topics is not None:
-                event_topics.extend(self.fail_topics)
+            if self.failed_topics is not None:
+                event_topics.extend(self.failed_topics)
 
-        self.kafkaprod.send(event_topics, kafkavent)
+        self.kafkaprod.send(event_topics, kafkavent, type='testresult')
 
-        '''
-        print(f"KAFKAVENT {kv_session} ({report.when}): ",
-            report.nodeid, report.location,
-            report.outcome, report.longrepr,
-            report.duration, report.sections,
-            report.keywords)
-        '''
+
+def pytest_addoption(parser):
+    group = parser.getgroup("kafkavent")
+    group.addoption(
+        "--kv_conf",
+        action="store",
+        dest="kv_configfile",
+        default="kafka_conf.json",
+        help='Kafka connection configs',
+    )
+    group.addoption(
+        "--kv_session_name",
+        action="store",
+        dest="kv_session_name",
+        default="Kafkavent Session",
+        help='Session name for endpoint consumers to collate session data',
+    )
+    group.addoption(
+        "--kv_session_id",
+        action="store",
+        dest="kv_session_id",
+        default=None,
+        help='Session ID for endpoint consumers to collate session data',
+    )
+    group.addoption(
+        "--kv_topics",
+        action="store",
+        dest="kv_topics",
+        default=[],
+        help='Kafka topic to send events on',
+    )
+    group.addoption(
+        "--kv_topics_failed",
+        action="store",
+        dest="kv_failed_topics",
+        default=None,
+        help='Kafka topic to send FAILED test events on',
+    )
+    group.addoption(
+        "--kv_eventlog",
+        action="store",
+        dest="kv_eventlog",
+        default=None,
+        help='Log to store events for debug and replay',
+    )
+
+def pytest_configure(config):
+    """Configure global items and add things to the config"""
+
+    kafkavent = Kafkavent(config)
+    config.pluginmanager.register(kafkavent, 'kafkavent')
+
+
+def pytest_unconfigure(config):
+    pass

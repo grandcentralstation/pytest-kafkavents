@@ -8,7 +8,4 @@ Install plugin for dev
 
 Run the test pytest
 
-    $ pytest example_tests \
-      --junitxml=/tmp/kafkavent.xml --kv_sessionprefix=holloway \
-      --kv_topic=my-other-topic --no-summary
-
+    $ pytest example_tests/ --junitxml=/tmp/kafkavent.xml --kv_topics=my-other-topic
