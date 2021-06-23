@@ -33,16 +33,19 @@ On Fedora...
 ./kafka-topics.sh --create --topic kafkavent --bootstrap-server my-kafka-n--u-bvmxxe-dvgycp-axfjmaftyk.bf2.kafka.rhcloud.com:443 --command-config ../config/app-services.properties
 ./kafka-topics.sh --create --topic kafkavent-failed --bootstrap-server my-kafka-n--u-bvmxxe-dvgycp-axfjmaftyk.bf2.kafka.rhcloud.com:443 --command-config ../config/app-services.properties
 ```
-
+5. Setup env variables
+```
+export KV_BOOTSTRAP_SERVER=my-kafka-example.rhcloud.com:443
+```
 6. Start one consumer in one window to see pytest-kafkavent messages for all tests
 ```
-    ./kafka-console-consumer.sh --bootstrap-server my-kafka-n--u-bvmxxe-dvgycp-axfjmaftyk.bf2.kafka.rhcloud.com:443 \
-    --consumer.config ../config/app-services.properties --from-beginning --topic kafkavent
+    ./kafka-console-consumer.sh --bootstrap-server $KV_BOOTSTRAP_SERVER \
+    --consumer.config ../config/app-services.properties --from-beginning --topic kafkavents
 ```
 7. Start another consumer in another window to see pytest-kafkavent messages for failed tests only
 ```
-    ./kafka-console-consumer.sh --bootstrap-server my-kafka-n--u-bvmxxe-dvgycp-axfjmaftyk.bf2.kafka.rhcloud.com:443 \
-    --consumer.config ../config/app-services.properties --from-beginning --topic kafkavent-failed
+    ./kafka-console-consumer.sh --bootstrap-server $KV_BOOTSTRAP_SERVER \
+    --consumer.config ../config/app-services.properties --from-beginning --topic kafkavents-failed
 ```
 9. Run the example pytest test scripts
 ```
@@ -53,3 +56,11 @@ On Fedora...
 10. Or just pull the container from [Quay.io](https://quay.io) :-)
 
 TODO: create a container with all of this goodness in it, upload to Quay.io, and link here
+
+
+Use the test generator...
+```
+pytest example_tests/ --kv-conf examples/kafka_conf.json \
+--kv-topics kafkavent --kv-topics-failed kafkavent-failed \
+--kv-eventlog=/tmp/kafkavent.log -k test_kafkavents --kv-test 4,1,1,1
+```

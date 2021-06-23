@@ -1,5 +1,5 @@
 {
-    "bootstrap.servers": "my-kafka-n--u-bvmxxe-dvgycp-axfjmaftyk.bf2.kafka.rhcloud.com:443",
+    "bootstrap.servers": "holloway-d--uj-dzpkwhsb-oea-yjsc--obla.bf2.kafka.rhcloud.com:443",
     "group.id": "foo",
     "sasl.mechanism": "PLAIN",
     "security.protocol": "SASL_SSL", 

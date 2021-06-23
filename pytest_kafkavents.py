@@ -15,54 +15,56 @@
 #
 import json
 import os
-import pytest
 import random
+import re
 import uuid
+
+#import pytest
 
 from confluent_kafka import Producer
 
 
 '''
-def pytest_runtest_setup(item):
-    # print("\nconftest setting up", item)
-    pass
-
-
-def pytest_runtest_teardown(item):
-    #print("\nconftest tearing down", item)
-    pass
-
-
 def pytest_runtest_makereport(item, call):
     print('\nRUNTEST MAKEREPORT')
     #print(item.config)
 '''
 
 class KafkaProducer(object):
-    def __init__(self, configfile=None, logfile=None, sessionid=None):
+    def __init__(self, configfile=None, logfile=None, sessionid=None,
+                 topics=None, send_events=True):
+        """Manages configuring and sending events to Kafka"""
         if sessionid is None:
             session_hash = str(uuid.uuid4())
             self.session_uuid = session_hash
+            if sessionid is not None:
+                self.session_uuid = sessionid
             self.logfile = logfile
+            self.send_events = send_events
+            self.topic_packetnum = {}
 
         # Setup Kafka
-        fileh = open(configfile)
-        kafkaconf = json.load(fileh)
-        fileh.close()
+        if self.send_events is not None:
+            with open(configfile) as fileh:
+                kafkaconf = json.load(fileh)
 
-        self.producer = Producer(kafkaconf)
+            self.producer = Producer(kafkaconf)
 
-        self.packetnum = 0
+        self.sessionnum = 0
+        for topic in topics:
+            self.topic_packetnum[topic] = 0
 
-        if os.path.exists(logfile):
-            os.remove(logfile)
+        if logfile is not None:
+            if os.path.exists(logfile):
+                os.remove(logfile)
 
     def send(self, topics, event, type='kafkavent', header=None):
-        self.packetnum = self.packetnum + 1
+        self.sessionnum = self.sessionnum + 1
         packet = {
             'header': {
                 'session_id': self.session_uuid,
-                'packetnum': self.packetnum,
+                'session_num': self.sessionnum,
+                'packetnum': 0,
                 'type': type,
                 'source': 'pytest-kafkavent',
                 'version': '0.01'
@@ -71,22 +73,30 @@ class KafkaProducer(object):
         packet.update({'event': event})
 
         # send to kafka
-        for topic in topics:
-            self.producer.produce(topic, json.dumps(packet).rstrip())
-            self.producer.flush()
+        if self.send_events:
+            # TODO: squelch dupe topics
+            for topic in topics:
+                self.topic_packetnum[topic] = self.topic_packetnum[topic] + 1
+                packet['header']['topic'] = topic
+                packet['header']['packetnum'] = self.topic_packetnum[topic]
+                self.producer.produce(topic, json.dumps(packet).rstrip())
+                self.producer.flush()
 
         # write to file
         if self.logfile:
+            #print(f'LOGFILE: {self.logfile}')
             fileh = open(self.logfile, "a")
             fileh.write(json.dumps(packet))
             fileh.write('\n')
             fileh.close()
 
-class Kafkavent(object):
+
+class Kafkavent():
     def __init__(self, config):
         self.config = config
         self.topics = []
         self.fail_topics = None
+        self.infra_topics = None
         self.session_name = config.getoption('kv_session_name')
         self.eventlog = config.getoption('kv_eventlog', None)
         self.kafkaconfig = config.getoption('kv_configfile', None)
@@ -95,20 +105,58 @@ class Kafkavent(object):
             self.topics = config.getoption('kv_topics').split(',')
         if config.getoption('kv_failed_topics'):
             self.failed_topics = config.getoption('kv_failed_topics').split(',')
-
+        if config.getoption('kv_infra_topics'):
+            self.infra_topics = config.getoption('kv_infra_topics').split(',')
+            self.all_topics = self.topics + self.failed_topics + self.infra_topics
         session_uuid = config.getoption('kv_sessionid', None)
 
         if self.kafkaconfig is not None:
             self.kafkaprod = KafkaProducer(self.kafkaconfig,
-                                           sessionid=session_uuid, logfile=self.eventlog)
+                                           sessionid=session_uuid, logfile=self.eventlog,
+                                           send_events=config.getoption('kv_sendevents'),
+                                           topics=self.all_topics)
+
+    @staticmethod
+    def get_event_domain(nodeid):
+        nodelist = nodeid.split('::')
+        filepath = nodelist[0]
+        # drop the file extension
+        noext_path = filepath.split('.')[0]
+        domainlist = noext_path.split('/')
+        # add the last nodelist elements
+        offset = (len(nodelist) - 1) * -1
+        domainlist.extend(nodelist[offset:])
+
+        # check the last domtet for parametrized
+        # test_generated[skipped-ARM-Linux]
+        testcase_domtet = domainlist[-1:]
+        ptrized = re.match('(.*)\[(.*)\]', testcase_domtet[0])
+        if ptrized:
+            domainlist[len(domainlist) - 1] = ptrized.groups()[0]
+            domainlist.append(ptrized.groups()[1])
+
+        # back to string
+        domain = '.'.join(domainlist)
+
+        return domain
 
     def pytest_sessionstart(self, session):
+        """send session start event"""
         #print('\nSESSION STARTED')
         self.kafkaprod.send(self.topics, {'name': self.session_name}, type='sessionstart')
 
+        if self.infra_topics is not None:
+            self.kafkaprod.send(self.infra_topics, {'function': 'pytest_sessionfinish'}, type='infra')
+            # TODO: design the schema
+
     def pytest_sessionfinish(self, session, exitstatus):
+        """send session finished event"""
         #print('\nSESSION FINISHED')
         self.kafkaprod.send(self.topics, {'name': self.session_name}, type='sessionend')
+
+        if self.infra_topics is not None:
+            self.kafkaprod.send(self.infra_topics, {'function': 'pytest_sessionfinish'}, type='infra')
+            # TODO: design the schema
 
     def pytest_runtest_logreport(self, report):
         #print('RUNTEST LOGREPORT ', report.nodeid)
@@ -122,6 +170,7 @@ class Kafkavent(object):
         kafkavent = {}
         kafkavent['pytest_when'] = report.when
         kafkavent['nodeid'] = report.nodeid
+        kafkavent['domain'] = self.get_event_domain(report.nodeid)
         kafkavent['status'] = report.outcome
         # TODO: add timestamp
         kafkavent['duration'] = report.duration
@@ -138,6 +187,22 @@ class Kafkavent(object):
 
         self.kafkaprod.send(event_topics, kafkavent, type='testresult')
 
+        if self.infra_topics is not None:
+            self.kafkaprod.send(self.infra_topics, {'function': 'pytest_runtest_logreport'}, type='infra')
+            # TODO: design the schema
+
+    def pytest_runtest_setup(self, item):
+        # print("\nconftest setting up", item)
+        if self.infra_topics is not None:
+            self.kafkaprod.send(self.infra_topics, {'function': 'pytest_runtest_setup'}, type='infra')
+            # TODO: design the schema
+
+    def pytest_runtest_teardown(self, item):
+        #print("\nconftest tearing down", item)
+        if self.infra_topics is not None:
+            self.kafkaprod.send(self.infra_topics, {'function': 'pytest_runtest_teardown'}, type='infra')
+            # TODO: design the schema
+
     def pytest_terminal_summary(self, terminalreporter, exitstatus):
         kafkavent = {}
         kafkavent['passed'] = len(terminalreporter.stats.get('passed',[]))
@@ -147,15 +212,19 @@ class Kafkavent(object):
         kafkavent['status'] = exitstatus
         self.kafkaprod.send(self.topics, kafkavent, type='summary')
 
+        if self.infra_topics is not None:
+            self.kafkaprod.send(self.infra_topics, {'function': 'pytest_terminal_summary'}, type='infra')
+            # TODO: design the schema
+
     def pytest_generate_tests(self, metafunc):
-        print('PYTEST GENERATE TESTS')
+        """generate tests to test event creation"""
+        #print('PYTEST GENERATE TESTS')
         if metafunc.config.getoption("kv_test"):
             nums = metafunc.config.getoption('kv_test').split(',')
             pass_num = int(nums[0])
             fail_num = int(nums[1])
             skip_num = int(nums[2])
             xfail_num = int(nums[3])
-            pass_num = pass_num - fail_num - skip_num - xfail_num
 
             test_outcomes = ['passed' for i in range(pass_num)]
             test_outcomes.extend(['failed' for i in range(fail_num)])
@@ -166,8 +235,14 @@ class Kafkavent(object):
 
             if "kvtest_outcome" in metafunc.fixturenames:
                 metafunc.parametrize("kvtest_outcome", test_outcomes)
+            if "kvtest_arch" in metafunc.fixturenames:
+                metafunc.parametrize("kvtest_arch", ['x86_64', 'ARM'])
+            if "kvtest_os" in metafunc.fixturenames:
+                metafunc.parametrize("kvtest_os", ['Linux', 'MacOS'])
+
 
 def pytest_addoption(parser):
+    """add command-line options"""
     group = parser.getgroup("kafkavent")
     group.addoption(
         "--kv-conf",
@@ -195,14 +270,21 @@ def pytest_addoption(parser):
         action="store",
         dest="kv_topics",
         default=[],
-        help='Kafka topic to send events on',
+        help='Kafka topic(s) to send events on',
     )
     group.addoption(
         "--kv-topics-failed",
         action="store",
         dest="kv_failed_topics",
         default=None,
-        help='Kafka topic to send FAILED test events on',
+        help='Kafka topic(s) to send FAILED test events on',
+    )
+    group.addoption(
+        "--kv-topics-infra",
+        action="store",
+        dest="kv_infra_topics",
+        default=None,
+        help='Kafka topic(s) to send PyTest infrastructure events on',
     )
     group.addoption(
         "--kv-eventlog",
@@ -218,14 +300,23 @@ def pytest_addoption(parser):
         default=None,
         help='Generate test events (# passes,# fails,# skips,# xfails)',
     )
+    group.addoption(
+        "--kv-skipsend",
+        action="store_false",
+        dest="kv_sendevents",
+        default=True,
+        help='Skip sending events',
+    )
 
 
 def pytest_configure(config):
     """Configure global items and add things to the config"""
 
-    kafkavent = Kafkavent(config)
-    config.pluginmanager.register(kafkavent, 'kafkavent')
+    if config.getoption('kv_configfile', None):
+        kafkavent = Kafkavent(config)
+        config.pluginmanager.register(kafkavent, 'kafkavent')
 
 
 def pytest_unconfigure(config):
+    """Unconfigure the items configured in configure"""
     pass
