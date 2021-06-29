@@ -1,9 +1,0 @@
-{"session": "holloway_CuW2JXJEQuvr_xH8fRqRFg", "pytest_when": "call", "nodeid": "example_tests/test_pytest_plugin.py::TestPyTestKafkavent::test_fail", "status": "failed", "duration": 0.0002573950041551143}
-{"session": "holloway_CuW2JXJEQuvr_xH8fRqRFg", "pytest_when": "call", "nodeid": "example_tests/test_pytest_plugin.py::TestPyTestKafkavent::test_fail2", "status": "failed", "duration": 0.00021871499484404922}
-{"session": "holloway_CuW2JXJEQuvr_xH8fRqRFg", "pytest_when": "call", "nodeid": "example_tests/test_pytest_plugin.py::TestPyTestKafkavent::test_pass", "status": "passed", "duration": 2.008950656017987}
-{"session": "holloway_CuW2JXJEQuvr_xH8fRqRFg", "pytest_when": "setup", "nodeid": "example_tests/test_pytest_plugin.py::TestPyTestKafkavent::test_skip", "status": "skipped", "duration": 0}
-{"session": "holloway_CuW2JXJEQuvr_xH8fRqRFg", "pytest_when": "call", "nodeid": "example_tests/test_pytest_plugin.py::TestPyTestKafkavent::test_xfail", "status": "skipped", "duration": 0}
-{"session": "holloway_CuW2JXJEQuvr_xH8fRqRFg", "pytest_when": "call", "nodeid": "example_tests/test_pytest_plugin2.py::TestPyTestKafkavent2::test_fail", "status": "failed", "duration": 0.00022249302128329873}
-{"session": "holloway_CuW2JXJEQuvr_xH8fRqRFg", "pytest_when": "call", "nodeid": "example_tests/test_pytest_plugin2.py::TestPyTestKafkavent2::test_fail2", "status": "failed", "duration": 0.00022231298498809338}
-{"session": "holloway_CuW2JXJEQuvr_xH8fRqRFg", "pytest_when": "call", "nodeid": "example_tests/test_pytest_plugin2.py::TestPyTestKafkavent2::test_pass", "status": "passed", "duration": 2.0105490529967938}
-{"session": "holloway_CuW2JXJEQuvr_xH8fRqRFg", "pytest_when": "setup", "nodeid": "example_tests/test_pytest_plugin2.py::TestPyTestKafkavent2::test_skip", "status": "skipped", "duration": 0}

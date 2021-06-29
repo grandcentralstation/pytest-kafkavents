@@ -13,6 +13,8 @@
 # You should have received a copy of the GNU General Public License
 # along with this software. If not, see <http://www.gnu.org/licenses/>.
 #
+import datetime
+import inspect
 import json
 import os
 import random
@@ -22,6 +24,7 @@ import uuid
 #import pytest
 
 from confluent_kafka import Producer
+from _pytest.runner import pytest_runtest_makereport as _makereport
 
 
 '''
@@ -64,10 +67,12 @@ class KafkaProducer(object):
             'header': {
                 'session_id': self.session_uuid,
                 'session_num': self.sessionnum,
+                'topic':'x',
                 'packetnum': 0,
                 'type': type,
                 'source': 'pytest-kafkavent',
-                'version': '0.01'
+                'version': '0.01',
+                'timestamp': datetime.datetime.utcnow().isoformat()
                 }
             }
         packet.update({'event': event})
@@ -107,7 +112,15 @@ class Kafkavent():
             self.failed_topics = config.getoption('kv_failed_topics').split(',')
         if config.getoption('kv_infra_topics'):
             self.infra_topics = config.getoption('kv_infra_topics').split(',')
-            self.all_topics = self.topics + self.failed_topics + self.infra_topics
+        self.all_topics = []
+        if self.topics:
+            self.all_topics.extend(self.topics)
+        if self.failed_topics:
+            self.all_topics.extend(self.failed_topics)
+        if self.infra_topics:
+            self.all_topics.extend(self.infra_topics)
+
+        #self.all_topics = self.topics + self.failed_topics + self.infra_topics
         session_uuid = config.getoption('kv_sessionid', None)
 
         if self.kafkaconfig is not None:

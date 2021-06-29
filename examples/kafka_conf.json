@@ -1,8 +1,0 @@
-{
-    "bootstrap.servers": "holloway-d--uj-dzpkwhsb-oea-yjsc--obla.bf2.kafka.rhcloud.com:443",
-    "group.id": "foo",
-    "sasl.mechanism": "PLAIN",
-    "security.protocol": "SASL_SSL", 
-    "sasl.username": "srvc-acct-820a23a1-b69b-48ac-b153-c3212805de0c",
-    "sasl.password": "baae54a6-92c1-4020-b405-935356faeb9c"
-}
