@@ -64,7 +64,7 @@ class KafkaProducer():
             'header': {
                 'session_id': self.session_uuid,
                 'session_num': self.sessionnum,
-                'topic': 'x',
+                'topic': '',
                 'packetnum': 0,
                 'type': type,
                 'source': 'pytest-kafkavent',

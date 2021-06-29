@@ -28,21 +28,24 @@ On Fedora...
 
 4. Copy and configure app-services.properties template to your local kafka client bin directory and fill-in info for your instance.
 
-5. Create topics (with the client command)
-```
-./kafka-topics.sh --create --topic kafkavent --bootstrap-server my-kafka-n--u-bvmxxe-dvgycp-axfjmaftyk.bf2.kafka.rhcloud.com:443 --command-config ../config/app-services.properties
-./kafka-topics.sh --create --topic kafkavent-failed --bootstrap-server my-kafka-n--u-bvmxxe-dvgycp-axfjmaftyk.bf2.kafka.rhcloud.com:443 --command-config ../config/app-services.properties
-```
 5. Setup env variables
 ```
 export KV_BOOTSTRAP_SERVER=my-kafka-example.rhcloud.com:443
 ```
-6. Start one consumer in one window to see pytest-kafkavent messages for all tests
+
+6. Create topics (with the client command)
+```
+./kafka-topics.sh --create --topic kafkavent --bootstrap-server my-kafka-n--u-bvmxxe-dvgycp-axfjmaftyk.bf2.kafka.rhcloud.com:443 --command-config ../config/app-services.properties
+./kafka-topics.sh --create --topic kafkavent-failed --bootstrap-server my-kafka-n--u-bvmxxe-dvgycp-axfjmaftyk.bf2.kafka.rhcloud.com:443 --command-config ../config/app-services.properties
+./kafka-topics.sh --create --topic kafkavent-infra --bootstrap-server my-kafka-n--u-bvmxxe-dvgycp-axfjmaftyk.bf2.kafka.rhcloud.com:443 --command-config ../config/app-services.properties
+```
+
+7. Start one consumer in one window to see pytest-kafkavent messages for all tests
 ```
     ./kafka-console-consumer.sh --bootstrap-server $KV_BOOTSTRAP_SERVER \
     --consumer.config ../config/app-services.properties --from-beginning --topic kafkavents
 ```
-7. Start another consumer in another window to see pytest-kafkavent messages for failed tests only
+8. Start another consumer in another window to see pytest-kafkavent messages for failed tests only
 ```
     ./kafka-console-consumer.sh --bootstrap-server $KV_BOOTSTRAP_SERVER \
     --consumer.config ../config/app-services.properties --from-beginning --topic kafkavents-failed
