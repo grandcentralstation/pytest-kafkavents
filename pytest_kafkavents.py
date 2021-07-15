@@ -55,7 +55,7 @@ class KafkaProducer():
             if os.path.exists(logfile):
                 os.remove(logfile)
 
-    def send(self, topics, event, type='kafkavent', header=None):
+    def send(self, topics, body, type='kafkavent', header=None):
         """Send an event to Kafka."""
         self.sessionnum = self.sessionnum + 1
         # FIXME: populate topic
@@ -72,7 +72,7 @@ class KafkaProducer():
                 'timestamp': datetime.datetime.utcnow().isoformat()
                 }
             }
-        packet.update({'event': event})
+        packet.update({'body': body})
 
         # send to kafka
         if self.send_events:
